@@ -316,56 +316,53 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public boolean onMarkerClick(Marker marker) {
-        Integer markerId = markerMapToStop.get(marker);
-        if (!selectedMarker.equals(markerId)) {
-            LocalMarker localMarker;
+        if (markerMapToStop.containsKey(marker)) {
+            Integer markerId = markerMapToStop.get(marker);
+            if (!selectedMarker.equals(markerId)) {
+                LocalMarker localMarker;
 
-            if (!selectedMarker.equals(-1)) {
-                localMarker = markerMap.get(selectedMarker);
-                if (localMarker.visible) {
-                    BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop);
-                    if (localMarker.bearing == -1) {
-                        bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop_start);
+                if (!selectedMarker.equals(-1)) {
+                    localMarker = markerMap.get(selectedMarker);
+                    if (localMarker.visible) {
+                        BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop);
+                        if (localMarker.bearing == -1) {
+                            bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop_start);
+                        }
+                        localMarker.marker.setIcon(bitmapDescriptor);
                     }
-                    localMarker.marker.setIcon(bitmapDescriptor);
                 }
+
+                selectedMarker = markerId;
+
+                clearVehicles();
+
+                localMarker = markerMap.get(markerId);
+
+                BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop_selected);
+
+                localMarker.marker.setIcon(bitmapDescriptor);
+                localMarker.marker.setRotation(0);
+
+                Request request = new Request();
+                request.type = "stop";
+                request.id = localMarker.id;
+
+                Gson gson = new Gson();
+
+
+                socket.emit("get", gson.toJson(request));
             }
-
-            selectedMarker = markerId;
-
-            clearVehicles();
-
-            localMarker = markerMap.get(markerId);
-
-            BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop_selected);
-
-            localMarker.marker.setIcon(bitmapDescriptor);
-            localMarker.marker.setRotation(0);
-
-            Request request = new Request();
-            request.type = "stop";
-            request.id = localMarker.id;
-
-            Gson gson = new Gson();
-
-
-            socket.emit("get", gson.toJson(request));
         }
         return false;
     }
 
     public void clearVehicles() {
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.post(new Runnable() {
-            public void run() {
-                for (Map.Entry<Integer, LocalVehicle> entry : vehicleMap.entrySet()) {
-                    LocalVehicle localVehicle = entry.getValue();
-                    vehicleMapToStop.remove(localVehicle.marker);
-                    localVehicle.marker.remove();
-                    vehicleMap.remove(localVehicle.id);
-                }
-            }
-        });
+        for (Map.Entry<Integer, LocalVehicle> entry : vehicleMap.entrySet()) {
+            LocalVehicle localVehicle = entry.getValue();
+            localVehicle.marker.remove();
+        }
+        vehicleMapToStop.clear();
+        vehicleMap.clear();
     }
 
     //GetBitmapMarker(getApplicationContext(), R.drawable.stop_start, "123");
@@ -447,13 +444,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         public int routeId;
     }
 
-    private Map<Integer, LocalMarker> markerMap = new ArrayMap<>();
-    private Map<Marker, Integer> markerMapToStop = new ArrayMap<>();
+    private volatile Map<Integer, LocalMarker> markerMap = new ArrayMap<>();
+    private volatile Map<Marker, Integer> markerMapToStop = new ArrayMap<>();
 
     private volatile Map<Integer, LocalVehicle> vehicleMap = new ArrayMap<>();
     private volatile Map<Marker, Integer> vehicleMapToStop = new ArrayMap<>();
 
-    private Integer selectedMarker = -1;
+    private volatile Integer selectedMarker = -1;
 
 
     /**
