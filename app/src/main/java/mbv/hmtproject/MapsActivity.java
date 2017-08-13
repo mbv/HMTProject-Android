@@ -1,7 +1,15 @@
 package mbv.hmtproject;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -16,6 +24,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
@@ -82,7 +91,29 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         public RecordRaw[] Records;
     }
 
+    public class VehiclesRaw {
+        public VehicleRaw[] Vehicles;
+    }
+
+    public class VehicleRaw {
+        public int Id;
+        public int IdEndStop;
+        public float Latitude;
+        public float Longitude;
+        public int TripType;
+        public int VehicleType;
+        public String Title;
+        public int RouteId;
+    }
+
     Socket socket;
+
+    BitmapDescriptor iconBus;
+    BitmapDescriptor iconBusR;
+    BitmapDescriptor iconTrolleybus;
+    BitmapDescriptor iconTrolleybusR;
+    BitmapDescriptor iconTram;
+    BitmapDescriptor iconTramR;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,11 +128,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         scoreboard.Routes = new ArrayList<>();
 
 
-
-
         ListView listView = (ListView) findViewById(R.id.scoreboard_table);
         scoreboardAdapter = new ScoreboardAdapter(this, scoreboard);
         listView.setAdapter(scoreboardAdapter);
+
+        iconBus = BitmapDescriptorFactory.fromResource(R.drawable.bus);
+        iconBusR = BitmapDescriptorFactory.fromResource(R.drawable.bus_r);
+        iconTrolleybus = BitmapDescriptorFactory.fromResource(R.drawable.trolleybus);
+        iconTrolleybusR = BitmapDescriptorFactory.fromResource(R.drawable.trolleybus_r);
+        iconTram = BitmapDescriptorFactory.fromResource(R.drawable.tram);
+        iconTramR = BitmapDescriptorFactory.fromResource(R.drawable.tram_r);
 
        /* StopRoute stopRoute = new StopRoute();
 
@@ -150,7 +186,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                     scoreboard.Routes.clear();
 
-                    for (RecordRaw record: scoreboardRaw.Records) {
+                    for (RecordRaw record : scoreboardRaw.Records) {
                         StopRoute tmp = new StopRoute();
 
                         tmp.VehicleType = record.Type;
@@ -168,7 +204,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     final LocalMarker marker = markerMap.get(scoreboard.StopId);
                     if (marker.visible) {
                         Handler handler = new Handler(Looper.getMainLooper());
-                        handler.post(new Runnable(){
+                        handler.post(new Runnable() {
                             public void run() {
                                 marker.marker.setSnippet(dateString);
                                 marker.marker.hideInfoWindow();
@@ -179,14 +215,90 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         });
                     }
 
-                   // scoreboardAdapter.notifyDataSetChanged();
+                    // scoreboardAdapter.notifyDataSetChanged();
 
                 }
 
+            }).on("sendV", new Emitter.Listener() {
+
+                @Override
+                public void call(Object... args) {
+                    String json = (String) args[0];
+                    Gson gson = new Gson();
+
+                    VehiclesRaw vehiclesRaw = gson.fromJson(json, VehiclesRaw.class);
+
+                    for (final VehicleRaw vehicleRaw : vehiclesRaw.Vehicles) {
+                        if (vehicleMap.containsKey(vehicleRaw.Id)) {
+                            final LocalVehicle vehicle = vehicleMap.get(vehicleRaw.Id);
+                            Handler handler = new Handler(Looper.getMainLooper());
+                            handler.post(new Runnable() {
+                                public void run() {
+                                    vehicle.marker.setPosition(new LatLng(vehicleRaw.Latitude, vehicleRaw.Longitude));
+                                }
+                            });
+                        } else {
+
+                            final LocalVehicle vehicle = new LocalVehicle();
+                            vehicle.latLng = new LatLng(vehicleRaw.Latitude, vehicleRaw.Longitude);
+
+                            vehicle.visible = true;
+                            vehicle.id = vehicleRaw.Id;
+                            vehicle.tripType = vehicleRaw.TripType;
+                            vehicle.vehicleType = vehicleRaw.VehicleType;
+                            vehicle.title = vehicleRaw.Title;
+                            vehicle.routeId = vehicleRaw.RouteId;
+
+                            final BitmapDescriptor bitmapDescriptor;
+
+                            switch (vehicle.vehicleType) {
+                                case 0:
+                                    if (vehicle.tripType == 10) {
+                                        bitmapDescriptor = iconBus;
+                                    } else {
+                                        bitmapDescriptor = iconBusR;
+                                    }
+                                    break;
+                                case 1:
+                                    if (vehicle.tripType == 10) {
+                                        bitmapDescriptor = iconTrolleybus;
+                                    } else {
+                                        bitmapDescriptor = iconTrolleybusR;
+                                    }
+                                    break;
+                                case 2:
+                                    if (vehicle.tripType == 10) {
+                                        bitmapDescriptor = iconTram;
+                                    } else {
+                                        bitmapDescriptor = iconTramR;
+                                    }
+                                    break;
+                                default:
+                                    bitmapDescriptor = iconBus;
+                            }
+
+                            Handler handler = new Handler(Looper.getMainLooper());
+                            handler.post(new Runnable() {
+                                public void run() {
+                                    vehicle.marker = mMap.addMarker(new MarkerOptions()
+                                            .position(vehicle.latLng)
+                                            .title(vehicle.title)
+                                            .icon(bitmapDescriptor));
+
+
+                                    vehicleMap.put(vehicle.id, vehicle);
+                                    vehicleMapToStop.put(vehicle.marker, vehicle.id);
+                                }
+                            });
+                        }
+                    }
+
+                }
             }).on(Socket.EVENT_DISCONNECT, new Emitter.Listener() {
 
                 @Override
-                public void call(Object... args) {}
+                public void call(Object... args) {
+                }
 
             });
             socket.connect();
@@ -204,18 +316,59 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public boolean onMarkerClick(Marker marker) {
-        LocalMarker localMarker = markerMap.get(markerMapToStop.get(marker));
+        Integer markerId = markerMapToStop.get(marker);
+        if (!selectedMarker.equals(markerId)) {
+            LocalMarker localMarker;
 
-        Request request = new Request();
-        request.type = "stop";
-        request.id = localMarker.id;
+            if (!selectedMarker.equals(-1)) {
+                localMarker = markerMap.get(selectedMarker);
+                if (localMarker.visible) {
+                    BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop);
+                    if (localMarker.bearing == -1) {
+                        bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop_start);
+                    }
+                    localMarker.marker.setIcon(bitmapDescriptor);
+                }
+            }
 
-        Gson gson = new Gson();
+            selectedMarker = markerId;
+
+            clearVehicles();
+
+            localMarker = markerMap.get(markerId);
+
+            BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop_selected);
+
+            localMarker.marker.setIcon(bitmapDescriptor);
+            localMarker.marker.setRotation(0);
+
+            Request request = new Request();
+            request.type = "stop";
+            request.id = localMarker.id;
+
+            Gson gson = new Gson();
 
 
-        socket.emit("get", gson.toJson(request));
+            socket.emit("get", gson.toJson(request));
+        }
         return false;
     }
+
+    public void clearVehicles() {
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(new Runnable() {
+            public void run() {
+                for (Map.Entry<Integer, LocalVehicle> entry : vehicleMap.entrySet()) {
+                    LocalVehicle localVehicle = entry.getValue();
+                    vehicleMapToStop.remove(localVehicle.marker);
+                    localVehicle.marker.remove();
+                    vehicleMap.remove(localVehicle.id);
+                }
+            }
+        });
+    }
+
+    //GetBitmapMarker(getApplicationContext(), R.drawable.stop_start, "123");
 
     @Override
     public void onCameraIdle() {
@@ -234,12 +387,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     }
                 } else {
                     if (!localMarker.visible) {
+                        BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop);
+                        if (localMarker.bearing == -1) {
+                            bitmapDescriptor = BitmapDescriptorFactory.fromResource(R.drawable.stop_start);
+
+                        }
                         localMarker.marker = mMap.addMarker(new MarkerOptions()
                                 .position(localMarker.latLng)
                                 .title(localMarker.title)
                                 .anchor((float) 0.5, (float) 0.5)
                                 .flat(true)
-                                .icon(BitmapDescriptorFactory.fromResource(R.drawable.stop)));
+                                .icon(bitmapDescriptor));
+                        if (localMarker.bearing != -1) {
+                            localMarker.marker.setRotation(localMarker.bearing);
+                        }
                         markerMapToStop.put(localMarker.marker, localMarker.id);
                         localMarker.visible = true;
                         counterVisibleMarkers++;
@@ -263,6 +424,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         float Latitude;
         float Longitude;
         String Name;
+        int Bearing;
     }
 
     private class LocalMarker {
@@ -271,10 +433,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         String title;
         Marker marker;
         boolean visible;
+        int bearing;
+    }
+
+    private class LocalVehicle {
+        int id;
+        LatLng latLng;
+        Marker marker;
+        boolean visible;
+        public int tripType;
+        public int vehicleType;
+        public String title;
+        public int routeId;
     }
 
     private Map<Integer, LocalMarker> markerMap = new ArrayMap<>();
     private Map<Marker, Integer> markerMapToStop = new ArrayMap<>();
+
+    private volatile Map<Integer, LocalVehicle> vehicleMap = new ArrayMap<>();
+    private volatile Map<Marker, Integer> vehicleMapToStop = new ArrayMap<>();
+
+    private Integer selectedMarker = -1;
 
 
     /**
@@ -320,6 +499,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             localMarker.latLng = new LatLng(element.Latitude, element.Longitude);
             localMarker.title = element.Name;
             localMarker.id = element.Id;
+            localMarker.bearing = element.Bearing;
 
 
             localMarker.visible = false;
@@ -380,5 +560,40 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void showMissingPermissionError() {
         PermissionUtils.PermissionDeniedDialog
                 .newInstance(true).show(getSupportFragmentManager(), "dialog");
+    }
+
+    public Bitmap GetBitmapMarker(Context mContext, int resourceId, String mText) {
+        try {
+            Resources resources = mContext.getResources();
+            float scale = resources.getDisplayMetrics().density;
+            Bitmap bitmap = BitmapFactory.decodeResource(resources, resourceId);
+
+            android.graphics.Bitmap.Config bitmapConfig = bitmap.getConfig();
+
+            // set default bitmap config if none
+            if (bitmapConfig == null)
+                bitmapConfig = android.graphics.Bitmap.Config.ARGB_8888;
+
+            bitmap = bitmap.copy(bitmapConfig, true);
+
+            Canvas canvas = new Canvas(bitmap);
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(Color.WHITE);
+            paint.setTextSize((int) (14 * scale));
+            paint.setShadowLayer(1f, 0f, 1f, Color.DKGRAY);
+
+            // draw text to the Canvas center
+            Rect bounds = new Rect();
+            paint.getTextBounds(mText, 0, mText.length(), bounds);
+            int x = 0;//(bitmap.getWidth() - bounds.width())/2;
+            int y = 0;//(bitmap.getHeight() + bounds.height())/2;
+
+            canvas.drawText(mText, x * scale, y * scale, paint);
+
+            return bitmap;
+
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
