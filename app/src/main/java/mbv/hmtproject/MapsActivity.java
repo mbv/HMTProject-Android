@@ -108,12 +108,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     Socket socket;
 
-    BitmapDescriptor iconBus;
-    BitmapDescriptor iconBusR;
-    BitmapDescriptor iconTrolleybus;
-    BitmapDescriptor iconTrolleybusR;
-    BitmapDescriptor iconTram;
-    BitmapDescriptor iconTramR;
+    Bitmap iconBus;
+    Bitmap iconBusR;
+    Bitmap iconTrolleybus;
+    Bitmap iconTrolleybusR;
+    Bitmap iconTram;
+    Bitmap iconTramR;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,12 +132,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         scoreboardAdapter = new ScoreboardAdapter(this, scoreboard);
         listView.setAdapter(scoreboardAdapter);
 
-        iconBus = BitmapDescriptorFactory.fromResource(R.drawable.bus);
-        iconBusR = BitmapDescriptorFactory.fromResource(R.drawable.bus_r);
-        iconTrolleybus = BitmapDescriptorFactory.fromResource(R.drawable.trolleybus);
-        iconTrolleybusR = BitmapDescriptorFactory.fromResource(R.drawable.trolleybus_r);
-        iconTram = BitmapDescriptorFactory.fromResource(R.drawable.tram);
-        iconTramR = BitmapDescriptorFactory.fromResource(R.drawable.tram_r);
+        Resources resources = getApplicationContext().getResources();
+
+        iconBus = BitmapFactory.decodeResource(resources, R.drawable.bus);
+        iconBusR = BitmapFactory.decodeResource(resources, R.drawable.bus_r);
+        iconTrolleybus = BitmapFactory.decodeResource(resources, R.drawable.trolleybus);
+        iconTrolleybusR = BitmapFactory.decodeResource(resources, R.drawable.trolleybus_r);
+        iconTram = BitmapFactory.decodeResource(resources, R.drawable.tram);
+        iconTramR = BitmapFactory.decodeResource(resources, R.drawable.tram_r);
 
        /* StopRoute stopRoute = new StopRoute();
 
@@ -249,42 +251,42 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             vehicle.title = vehicleRaw.Title;
                             vehicle.routeId = vehicleRaw.RouteId;
 
-                            final BitmapDescriptor bitmapDescriptor;
+                            Bitmap bitmap;
 
-                            switch (vehicle.vehicleType) {
+                           switch (vehicle.vehicleType) {
                                 case 0:
                                     if (vehicle.tripType == 10) {
-                                        bitmapDescriptor = iconBus;
+                                        bitmap = iconBus;
                                     } else {
-                                        bitmapDescriptor = iconBusR;
+                                        bitmap = iconBusR;
                                     }
                                     break;
                                 case 1:
                                     if (vehicle.tripType == 10) {
-                                        bitmapDescriptor = iconTrolleybus;
+                                        bitmap = iconTrolleybus;
                                     } else {
-                                        bitmapDescriptor = iconTrolleybusR;
+                                        bitmap = iconTrolleybusR;
                                     }
                                     break;
                                 case 2:
                                     if (vehicle.tripType == 10) {
-                                        bitmapDescriptor = iconTram;
+                                        bitmap = iconTram;
                                     } else {
-                                        bitmapDescriptor = iconTramR;
+                                        bitmap = iconTramR;
                                     }
                                     break;
                                 default:
-                                    bitmapDescriptor = iconBus;
+                                    bitmap = iconBus;
                             }
+
+                            final BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromBitmap(GetBitmapMarker(getApplicationContext(), bitmap, vehicle.title));
 
                             Handler handler = new Handler(Looper.getMainLooper());
                             handler.post(new Runnable() {
                                 public void run() {
                                     vehicle.marker = mMap.addMarker(new MarkerOptions()
                                             .position(vehicle.latLng)
-                                            .title(vehicle.title)
                                             .icon(bitmapDescriptor));
-
 
                                     vehicleMap.put(vehicle.id, vehicle);
                                     vehicleMapToStop.put(vehicle.marker, vehicle.id);
@@ -365,7 +367,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         vehicleMap.clear();
     }
 
-    //GetBitmapMarker(getApplicationContext(), R.drawable.stop_start, "123");
 
     @Override
     public void onCameraIdle() {
@@ -559,33 +560,31 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .newInstance(true).show(getSupportFragmentManager(), "dialog");
     }
 
-    public Bitmap GetBitmapMarker(Context mContext, int resourceId, String mText) {
+    public Bitmap GetBitmapMarker(Context mContext, Bitmap templateBitmap, String mText) {
         try {
             Resources resources = mContext.getResources();
             float scale = resources.getDisplayMetrics().density;
-            Bitmap bitmap = BitmapFactory.decodeResource(resources, resourceId);
 
-            android.graphics.Bitmap.Config bitmapConfig = bitmap.getConfig();
+            android.graphics.Bitmap.Config bitmapConfig = templateBitmap.getConfig();
 
-            // set default bitmap config if none
             if (bitmapConfig == null)
                 bitmapConfig = android.graphics.Bitmap.Config.ARGB_8888;
 
-            bitmap = bitmap.copy(bitmapConfig, true);
+            Bitmap bitmap = templateBitmap.copy(bitmapConfig, true);
 
             Canvas canvas = new Canvas(bitmap);
             Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
             paint.setColor(Color.WHITE);
             paint.setTextSize((int) (14 * scale));
-            paint.setShadowLayer(1f, 0f, 1f, Color.DKGRAY);
+            paint.setFakeBoldText(true);
 
-            // draw text to the Canvas center
+
             Rect bounds = new Rect();
             paint.getTextBounds(mText, 0, mText.length(), bounds);
-            int x = 0;//(bitmap.getWidth() - bounds.width())/2;
-            int y = 0;//(bitmap.getHeight() + bounds.height())/2;
+            int x = (bitmap.getWidth() - bounds.width() - 2)/2;
+            int y = 31;
 
-            canvas.drawText(mText, x * scale, y * scale, paint);
+            canvas.drawText(mText, x, y * scale, paint);
 
             return bitmap;
 
