@@ -11,8 +11,6 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
@@ -141,14 +139,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         iconTram = BitmapFactory.decodeResource(resources, R.drawable.tram);
         iconTramR = BitmapFactory.decodeResource(resources, R.drawable.tram_r);
 
-       /* StopRoute stopRoute = new StopRoute();
-
-        stopRoute.VehicleType = "T";
-        stopRoute.Number = "2";
-        stopRoute.Nearest = "<1";
-        stopRoute.Next = "3";
-
-        adapter.notifyDataSetChanged();*/
 
         try {
             socket = IO.socket("https://hmt.mbv-soft.ru");
@@ -205,8 +195,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                     final LocalMarker marker = markerMap.get(scoreboard.StopId);
                     if (marker.visible) {
-                        Handler handler = new Handler(Looper.getMainLooper());
-                        handler.post(new Runnable() {
+                        Helper.getInstance().runInUiLoop(new Runnable() {
                             public void run() {
                                 marker.marker.setSnippet(dateString);
                                 marker.marker.hideInfoWindow();
@@ -216,8 +205,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             }
                         });
                     }
-
-                    // scoreboardAdapter.notifyDataSetChanged();
 
                 }
 
@@ -233,8 +220,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     for (final VehicleRaw vehicleRaw : vehiclesRaw.Vehicles) {
                         if (vehicleMap.containsKey(vehicleRaw.Id)) {
                             final LocalVehicle vehicle = vehicleMap.get(vehicleRaw.Id);
-                            Handler handler = new Handler(Looper.getMainLooper());
-                            handler.post(new Runnable() {
+                            Helper.getInstance().runInUiLoop(new Runnable() {
                                 public void run() {
                                     vehicle.marker.setPosition(new LatLng(vehicleRaw.Latitude, vehicleRaw.Longitude));
                                 }
@@ -279,10 +265,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                     bitmap = iconBus;
                             }
 
-                            final BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromBitmap(GetBitmapMarker(getApplicationContext(), bitmap, vehicle.title));
+                            final BitmapDescriptor bitmapDescriptor = BitmapDescriptorFactory.fromBitmap(Helper.getInstance().GetBitmapMarker(getApplicationContext(), bitmap, vehicle.title));
 
-                            Handler handler = new Handler(Looper.getMainLooper());
-                            handler.post(new Runnable() {
+                            Helper.getInstance().runInUiLoop(new Runnable() {
                                 public void run() {
                                     vehicle.marker = mMap.addMarker(new MarkerOptions()
                                             .position(vehicle.latLng)
@@ -337,6 +322,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 selectedMarker = markerId;
 
                 clearVehicles();
+                Helper.getInstance().runInUiLoop(new Runnable() {
+                    public void run() {
+                        scoreboardAdapter.notifyDataSetChanged();
+                    }
+                });
 
                 localMarker = markerMap.get(markerId);
 
@@ -558,38 +548,5 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void showMissingPermissionError() {
         PermissionUtils.PermissionDeniedDialog
                 .newInstance(true).show(getSupportFragmentManager(), "dialog");
-    }
-
-    public Bitmap GetBitmapMarker(Context mContext, Bitmap templateBitmap, String mText) {
-        try {
-            Resources resources = mContext.getResources();
-            float scale = resources.getDisplayMetrics().density;
-
-            android.graphics.Bitmap.Config bitmapConfig = templateBitmap.getConfig();
-
-            if (bitmapConfig == null)
-                bitmapConfig = android.graphics.Bitmap.Config.ARGB_8888;
-
-            Bitmap bitmap = templateBitmap.copy(bitmapConfig, true);
-
-            Canvas canvas = new Canvas(bitmap);
-            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            paint.setColor(Color.WHITE);
-            paint.setTextSize((int) (14 * scale));
-            paint.setFakeBoldText(true);
-
-
-            Rect bounds = new Rect();
-            paint.getTextBounds(mText, 0, mText.length(), bounds);
-            int x = (bitmap.getWidth() - bounds.width() - 2)/2;
-            int y = 31;
-
-            canvas.drawText(mText, x, y * scale, paint);
-
-            return bitmap;
-
-        } catch (Exception e) {
-            return null;
-        }
     }
 }
